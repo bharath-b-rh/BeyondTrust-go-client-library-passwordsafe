@@ -50,14 +50,20 @@ func GetHttpClient(clientTimeOut int, verifyCa bool, certificate string, certifi
 		cert = certi
 	}
 
-	// TSL Config
-	var tr = &http.Transport{
-		TLSClientConfig: &tls.Config{
-			Renegotiation:      tls.RenegotiateOnceAsClient,
-			InsecureSkipVerify: !verifyCa,
-			Certificates:       []tls.Certificate{cert},
-			MinVersion:         tls.VersionTLS12,
-		},
+	// Use a clone of DefaultTransport so ProxyFromEnvironment (and other defaults)
+	// are set, a bare &http.Transport{} leaves them unset.
+	t, ok := http.DefaultTransport.(*http.Transport)
+	if !ok || t == nil {
+		return nil, fmt.Errorf("unexpected default http transport type")
+	}
+	tr := t.Clone()
+	// disable ForceAttemptHTTP2 to retain legacy behavior.
+	tr.ForceAttemptHTTP2 = false
+	tr.TLSClientConfig = &tls.Config{
+		Renegotiation:      tls.RenegotiateOnceAsClient,
+		InsecureSkipVerify: !verifyCa,
+		Certificates:       []tls.Certificate{cert},
+		MinVersion:         tls.VersionTLS12,
 	}
 
 	var jar, _ = cookiejar.New(nil)
